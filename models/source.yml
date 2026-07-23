@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: curated
+
+    database: DEV_BLUSKY_DW
+    schema: CURATED_JC
+
+    tables:
+      - name: DIM_CUSTOMER_SAMPLE
