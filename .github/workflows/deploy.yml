@@ -1,0 +1,51 @@
+name: Deploy dbt Project to Snowflake
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create ZIP
+        run: |
+          zip -r Stage_POC.zip . \
+            -x "*.git*" \
+            -x ".github/*" \
+            -x "target/*" \
+            -x "logs/*" \
+            -x ".venv/*" \
+            -x "__pycache__/*"
+
+      - name: Install Snowflake CLI
+        run: |
+          pip install snowflake-cli-labs
+
+      - name: Upload ZIP to Snowflake Stage
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+
+        run: |
+          snow connection add github \
+            --account $SNOWFLAKE_ACCOUNT \
+            --user $SNOWFLAKE_USER \
+            --password $SNOWFLAKE_PASSWORD \
+            --role $SNOWFLAKE_ROLE \
+            --warehouse $SNOWFLAKE_WAREHOUSE \
+            --database $SNOWFLAKE_DATABASE \
+            --schema $SNOWFLAKE_SCHEMA
+
+          snow stage copy Stage_POC.zip \
+            @CODE_STAGE \
+            --overwrite \
+            --connection github
