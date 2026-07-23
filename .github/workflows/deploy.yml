@@ -45,7 +45,7 @@ jobs:
             --database $SNOWFLAKE_DATABASE \
             --schema $SNOWFLAKE_SCHEMA
 
-          snow stage copy Stage_POC.zip \
+          snow stage copy dbt-snowflake-deploy.zip \
             @CODE_STAGE \
             --overwrite \
             --connection github
