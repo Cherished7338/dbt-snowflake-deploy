@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Create ZIP
@@ -21,31 +21,27 @@ jobs:
             -x ".venv/*" \
             -x "__pycache__/*"
 
-      - name: Install Snowflake CLI
+      - name: Install SnowSQL
         run: |
-          pip install snowflake-cli-labs
+          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.3/linux_x86_64/snowsql-1.3.2-linux_x86_64.bash
+          bash snowsql-1.3.2-linux_x86_64.bash
+
+      - name: Verify SnowSQL
+        run: |
+          snowsql --version
 
       - name: Upload ZIP to Snowflake Stage
         env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWSQL_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWSQL_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWSQL_PWD: ${{ secrets.SNOWFLAKE_PASSWORD }}
 
         run: |
-          snow connection add github \
-            --account $SNOWFLAKE_ACCOUNT \
-            --user $SNOWFLAKE_USER \
-            --password $SNOWFLAKE_PASSWORD \
-            --role $SNOWFLAKE_ROLE \
-            --warehouse $SNOWFLAKE_WAREHOUSE \
-            --database $SNOWFLAKE_DATABASE \
-            --schema $SNOWFLAKE_SCHEMA
-
-          snow stage copy dbt-snowflake-deploy.zip \
-            @CODE_STAGE \
-            --overwrite \
-            --connection github
+          snowsql \
+            -a $SNOWSQL_ACCOUNT \
+            -u $SNOWSQL_USER \
+            -r "${{ secrets.SNOWFLAKE_ROLE }}" \
+            -w "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            -d "${{ secrets.SNOWFLAKE_DATABASE }}" \
+            -s "${{ secrets.SNOWFLAKE_SCHEMA }}" \
+            -q "PUT file://dbt-snowflake-deploy.zip @CODE_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE;"
