@@ -5,15 +5,17 @@ on:
 
 jobs:
   deploy:
+
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Create ZIP
         run: |
-          zip -r dbt-snowflake-deploy.zip . \
+          zip -r Stage_POC.zip . \
             -x "*.git*" \
             -x ".github/*" \
             -x "target/*" \
@@ -21,27 +23,62 @@ jobs:
             -x ".venv/*" \
             -x "__pycache__/*"
 
-      - name: Install SnowSQL
-        run: |
-          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.3/linux_x86_64/snowsql-1.3.2-linux_x86_64.bash
-          bash snowsql-1.3.2-linux_x86_64.bash
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-      - name: Verify SnowSQL
+      - name: Install Snowflake Connector
         run: |
-          snowsql --version
+          python -m pip install --upgrade pip
+          pip install snowflake-connector-python
 
-      - name: Upload ZIP to Snowflake Stage
+      - name: Upload ZIP and Execute Stored Procedure
         env:
-          SNOWSQL_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWSQL_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWSQL_PWD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
 
         run: |
-          snowsql \
-            -a $SNOWSQL_ACCOUNT \
-            -u $SNOWSQL_USER \
-            -r "${{ secrets.SNOWFLAKE_ROLE }}" \
-            -w "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
-            -d "${{ secrets.SNOWFLAKE_DATABASE }}" \
-            -s "${{ secrets.SNOWFLAKE_SCHEMA }}" \
-            -q "PUT file://dbt-snowflake-deploy.zip @CODE_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE;"
+          python <<EOF
+          import snowflake.connector
+
+          conn = snowflake.connector.connect(
+              account="${SNOWFLAKE_ACCOUNT}",
+              user="${SNOWFLAKE_USER}",
+              password="${SNOWFLAKE_PASSWORD}",
+              warehouse="${SNOWFLAKE_WAREHOUSE}",
+              database="${SNOWFLAKE_DATABASE}",
+              schema="${SNOWFLAKE_SCHEMA}",
+              role="${SNOWFLAKE_ROLE}",
+          )
+
+          cur = conn.cursor()
+
+          print("Uploading ZIP to Snowflake Stage...")
+
+          cur.execute("""
+          PUT file://Stage_POC.zip
+          @CODE_STAGE
+          AUTO_COMPRESS=FALSE
+          OVERWRITE=TRUE
+          """)
+
+          print("ZIP uploaded successfully.")
+
+          print("Executing Stored Procedure...")
+
+          cur.execute("CALL TEST_DBT_RUNNER();")
+
+          for row in cur:
+              print(row)
+
+          cur.close()
+          conn.close()
+
+          print("Deployment completed successfully.")
+          EOF
