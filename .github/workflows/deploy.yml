@@ -13,7 +13,7 @@ jobs:
 
       - name: Create ZIP
         run: |
-          zip -r Stage_POC.zip . \
+          zip -r dbt-snowflake-deploy.zip . \
             -x "*.git*" \
             -x ".github/*" \
             -x "target/*" \
